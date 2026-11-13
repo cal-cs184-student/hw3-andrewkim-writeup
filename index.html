@@ -28,79 +28,478 @@
 	<body>
 		<div class="container">
 		<h1>CS184/284A Fall 2026 Homework 3 Write-Up</h1>
-		<div style="text-align: center;">Names: </div>
+		<div style="text-align: center;">Name: Andrew Kim</div>
 
 		<br>
 
-		Link to webpage: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
-		Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
-		
+		<p>Link to webpage: <a href="https://cal-cs184-student.github.io/hw3-andrewkim-writeup/">https://cal-cs184-student.github.io/hw3-andrewkim-writeup/</a></p>
+		<p>Link to GitHub repository: <a href="https://github.com/cal-cs184-student/hw3-andrewkim">https://github.com/cal-cs184-student/hw3-andrewkim</a></p>
+
 		<figure>
-			<img src="assets/cornell.png" alt="Cornell Boxes with Bunnies" style="width:70%"/>
-			<figcaption>You can add images with captions!</figcaption>
+			<img src="assets/cornell.png" alt="Cornell Boxes with Bunnies" style="width:100%"/>
 		</figure>
 
-		<!--
-		We've already added one heading per part, to make your write-up as navigable when grading. Please fit your write-up within these sections!
-		-->
+		<br>
 
 		<h2>Overview</h2>
-		Give a high-level overview of what you implemented in this homework. Think about what you've built as a whole. Share your thoughts on what interesting things you've learned from completing the homework.
+		<p>In this assignment, I implemented a physically-based path tracer that simulates the physics of light in order to create highly realistic images. We started by creating the means to do this through ray intersection by shooting a ray from our camera, through a screen, and into the scene we want to render an image of. Naturally, all of the processes in this assignment required a lot of time to calculate, so we then implemented a way to speed them up through Bounding Volume Hierarchy, similar to bounding boxes we used in previous assignments. Finally, we implemented the meat of the assignment, the behavior of light itself, for both direct and global illumination, ending by implementing an even faster way to render images, adaptive sampling.</p>
+
+		<p>Something interesting I really enjoyed in this assignment was the process of converting real life physics and light into a computer to simulate. We didn’t have to specify exactly where a shadow falls or what color gets reflected onto nearby objects to the computer. Instead, I found it really cool how the engine simulated these effects all at once by applying our math across the entire scene.</p>
+
+		<br>
 
 		<h2>Part 1: Ray Generation and Scene Intersection</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>The ray generation part of the rendering pipeline enables us to take a 3-dimensional scene and convert it into a 2-dimensional image on our screen. To understand the process, it is important to understand the numerous coordinate spaces we work in when doing so, namely the world space and camera space. The world space is the environment of the 3D scene where objects are placed at locations with coordinates that never change. The camera space is from the perspective of the viewer, like first-person mode in a video game, as they look around the scene. These coordinates stay unchanged relative to the viewer, but the camera’s location in the scene does change as it moves around. To create 2D images of a 3D scene, we use the help of a “virtual window” that we can visualize as a screen set up right in front of the camera. This window acts as the 2D display that is your screen, and it will help us determine what color each pixel should be as we look through the window into the scene.</p>
 
-		<p>Here is an example 2x2 gridlike structure using an HTML table. Each <b>tr</b> is a row and each <b>td</b> is a column in that row. You might find this useful for framing and showing your result images in an organized fashion.</p>
+		<p>In ray generation, we shoot rays from the camera through a pixel (on the virtual window) and into the scene until they hit some object. To start, we take the normalized coordinates of that pixel and transform them into camera space using our field of view angles (fov), which tell us the area of the scene our camera can see. Using the fact that the camera looks down the -Z axis, where the window sits 1 unit away, we calibrate the image coordinates with the 3D camera space coordinates. Our camera sits at (0, 0, 0) in camera space, which is where our ray will start as we then “shoot” it through these calibrated coordinates, normalizing the resulting vector. Finally, we take everything we have and move it into world space. Since our camera moves around, it isn’t always at (0, 0, 0) in world space, so we have to adjust so that our rays are correctly angled to hit the right objects. To do this, transform the ray’s origin and direction vector into world space using the c2w matrix, which positions the ray based on where the camera is pointing. We also adjust the camera’s view of anything that is too close or too far by setting <code>min_t</code> and <code>max_t</code> to <code>nclip</code> and <code>fclip</code>, respectively. We end by creating a Ray object to package everything together.</p>
+
+		<p>After shooting a ray into the scene, we run intersection tests to see what it actually hits. There could be multiple objects in its path, but we only care about the closest one since that is what the camera will see. For every object it hits, we check if it is closer than our current closest hit, and if so, we record relevant information about the collision and update <code>max_t</code>. The triangle intersection algorithm I implemented gives us this information about the collision. I integrated the Möller-Trumbore algorithm to optimize the process of finding the triangle that the ray hits, which uses dot and cross products to solve a system of linear equations based on the edge vectors of the triangle, giving us t and the Barycentric coordinates (u and v). We use these to verify that the ray does in fact hit inside the triangle, checking if t is within <code>min_t</code> and <code>max_t</code> and if u, v, and w are all between 0 and 1. We also use the Barycentric coordinates to linearly interpolate the three vertex normals and find the surface normal at the intersection point. With a valid intersection, we end by filling the <code>*isect</code> structure with the information about the collision: the t-value, the surface normal, the primitive that was intersected, and the surface material, all at that point.</p>
+
+		<p>Here are some images with normal shading rendered using my implementation:</p>
+
 		<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
 			  <tr>
 				<td style="text-align: center;">
-				  <img src="assets/cornell.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/Part1_cube.png" width="400px"/>
 				</td>
 				<td style="text-align: center;">
-				  <img src="assets/cornell.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-			  </tr>
-			  <tr>
-				<td style="text-align: center;">
-				  <img src="assets/cornell.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-				<td style="text-align: center;">
-				  <img src="assets/cornell.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/Part1_plane.png" width="400px"/>
 				</td>
 			  </tr>
 			</table>
 		</div>
+
+		<figure>
+			<img src="assets/Part1_banana.png" alt="Cornell Boxes with Bunnies" style="width:70%"/>
+		</figure>
+
+		<br>
 		
 		<h2>Part 2: Bounding Volume Hierarchy</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>My BVH construction algorithm is implemented using the binary tree structure as explained in the project spec. At a high-level, we group primitives up into boxes that we then check whether rays hit, enabling us to eliminate entire boxes at a time if no collisions occur and thus speed up the rendering process.</p>
+
+		<p>To begin, we use recursion on the list of primitives we receive in the parameters as suggested in the spec. We create a bounding box <code>bbox</code> as well as initialize a counter variable <code>numObjects</code> to keep track of how many primitives are in the list. Running through the list using the iterators <code>start</code> and <code>end</code>, we expand our bounding box to see how “big” our group of primitives in the scene is and count them up using <code>numObjects</code>. Both of these will help us in the function later on. We end this first part of the function by storing our expanded bounding box as a new <code>BVHNode</code>.</p>
+
+		<p>The base case checks if the list of primitives we were given is small enough to make a leaf node out of them (no larger than <code>max_leaf_size</code>). If it is, the node we created is modified to set its start and end iterators to <code>start</code> and <start>end</start>, respectively, as well as its children <code>l</code> and <code>r</code> to NULL, returning the node to end the recursion.</p>
+
+		<p>If this node is not a leaf node, our recursive calls will be on both the left and right sides of the group after we split it up. We first find where to split the group of primitives by finding the longest axis (x, y, or z) and the <code>splitPoint</code>. The axis is found by comparing the dimensions of the bounding box’s extent. <code>splitPoint</code> is determined based on this axis and the average centroids along it, which is the heuristic I chose for picking the splitting point since it is based on where the geometry is clustered. We calculate this average by adding up the centroids and dividing by <code>numObjects</code> we found at the beginning of the function. Using these, we iterate through the list and collect all objects that are on the left side (< <code>splitPoint</code>) in a vector <code>sortedObjects</code>, counting the total number on this side along the way. We then collect all of the objects that are on the right side of the split point and add them to <code>sortedObjects</code>. At this stage, it is vital that we check whether or not all primitives ended up on one side to avoid infinite recursive calls. If they did, we empty out <code>sortedObjects</code> and add the primitives based on their order in the original list we were given, giving half of them to the left side. Regardless of whether we had to adjust for this case or not, we take our resulting <code>sortedObjects</code> vector and replace the original list with these elements. We now have all the components needed for the recursive call. We find the point where the left and right sides split, <code>midPoint</code>, by adding the number of objects on the left to <code>start</code>. This is what allows us to call the function on the left and right sides and set their return values to the left and right children respectively:</p>
+
+		<p style="text-indent: 60px;"><code>node->l = construct_bvh(start, midPoint, max_leaf_size);</code></p>
+		<p style="text-indent: 60px;"><code>node->r = construct_bvh(midPoint, end, max_leaf_size);</code></p>
+
+		<p>Once we have our children, we return the node to end the function.</p>
+
+		<p>Here are some images of large .dae files with normal shading that are rendered using this implemented BVH acceleration:</p>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part2_maxplanck.png" width="400px"/>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part2_CBlucy.png" width="400px"/>
+				</td>
+			  </tr>
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part2_dragon.png" width="400px"/>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part2_beast.png" width="400px"/>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<p>I rendered some scenes that have moderately complex geometries with and without BVH acceleration to compare their rendering times. To render without BVH acceleration, I commented out my implementation in <code>has_intersection()</code> and <code>intersect()</code>, replacing them with loops that go through each primitive linearly. Using cow.dae from the timing experiment in this section, without using BVH acceleration it took 49.8036 seconds to render the image. However, with BVH acceleration it took just 0.1646 seconds. When rendering CBcoil.dae without BVH acceleration, it took 48.2403 seconds to complete, while using BVH acceleration took just 0.1601 seconds. Rendering building.dae took the longest at a whopping 712.2459 seconds (11.87 minutes!) without BVH acceleration, but using BVH acceleration brought it all the way down to just 0.0954 seconds (the fastest of the three!). As we can see, using BVH acceleration is clearly much faster than without it, using just simple heuristics as in my implementation, taking rendering time from O(n) complexity down to O(log(n)). This is because it allows us to bypass many primitives at once using the binary tree structure, allowing us to avoid going through those not in the bounding boxes (which linearly checking does go through, hence the longer times).</p>
+
+		<br>
 
 		<h2>Part 3: Direct Illumination</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>The direct lighting function can be used with either uniform hemisphere sampling or by importance sampling, both of which are used to simulate how light behaves in our 3D scene. These enable us to create realistic shadows and highlights when we have a light source that shines on the objects. In this part, we were concerned with rendering light bouncing one time before reaching our camera.</p>
+
+		<p>The direct lighting function using uniform hemisphere sampling was implemented following a two-step process. At a high-level, we first shoot a ray from the camera through a pixel and into the scene until we hit an object. Then, we use uniform hemisphere sampling and the Monte Carlo estimator to find out what color that location on the object is, which will be the color of our pixel.</p>
+
+		<p>To start the implementation, I modified <code>estimate_direct_lighting_hemisphere()</code> to run the Monte Carlo estimator by looping through <code>num_sample</code> directions to figure out the average lighting value at our location. At each pass, we sample a random direction using <code>hemisphereSampler</code> and calculate the probability density function (pdf) before converting this direction vector into world space coordinates by multiplying it by <code>o2w</code>. We then create a new <code>Ray</code>> object that will be shot into the scene in this randomly sampled direction, setting its <code>min_t</code> value to <code>EPS_F</code> in order to avoid numerical precision issues. The next step is to actually send the ray into the scene and check if it collides with any object using our previously implemented <code>bvh->intersect()</code> function. If we do collide, we store information about the collision, check if that object is a light source by getting its emission value, and use the material’s BSDF evaluation math from task 1 to calculate the amount of light that gets sent back to the camera. We divide each individual sample by its own pdf before adding it to a running sum. This sum is our total amount of accumulated light, which is then divided by <code>num_samples</code> at the end to get the final color for the pixel.</p>
+
+		<p>As for importance sampling, the process improves on the approach we used with uniform hemisphere sampling by looking at the light sources and sending rays directly to them instead of in random directions. This will improve how we look at and render shadows.</p>
+
+		<p>To implement importance sampling, I <code>modified estimate_direct_lighting_importance()</code> by looping through each light source in the scene. We first check what kind of light source the current one is to determine our sample rate: if it is a delta light source, we use one sample, otherwise we use <code>ns_area_light</code>, storing the value in <code>num_samples</code>. We then create a running sum of all the light from this source as well as a nested loop that will accumulate and add to this value. We loop through and sample <code>num_samples</code> times for the current light source, storing information about its direction, distance, and pdf as well as its radiance before converting the direction vector from world space to object space. At this point, as a quick safety measure we check if this light is behind the surface plane and skip this sample if it is. We continue on by creating a “shadow” ray to shoot from our surface to the light source (using <code>EPS_F</code> here as well to avoid numerical precision issues), fire it into the scene (only up to the distance of the light, minus <code>EPS_F</code>), and check if it intersects with anything. If it does, that means an object is blocking the light and we are in a shadow, which means we should skip this sample as well. Otherwise, we reach the light source and then use our BSDF evaluation math to find out how much light our surface material reflects, ending this iteration of the nested loop by adding the amount of light this ray is contributing to our surface point to our running sum. We end the outer loop by averaging the brightness of the current light source by dividing our sum by <code>num_samples</code> and adding it to <code>L_out</code>, the global running sum for the entire scene. The function itself ends by returning this final brightness and thus the pixel color.</p>
+
+		<p>To combine both approaches of the direct lighting function, I modified <code>one_bounce_radiance()</code> that calls either <code>estimate_direct_lighting_hemisphere()</code> or <code>estimate_direct_lighting_importance()</code> depending on which one the user wants to use given the <code>direct_hemisphere_sample</code> flag.</p>
+
+		<p>Here are some images rendered using both implementations of the direct lighting function that we can compare side by side:</p>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part3_bunny_hemisphere.png" width="400px"/>
+				  <figcaption>Uniform Hemisphere Sampling</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part3_bunny_importance.png" width="400px"/>
+				  <figcaption>Importance Sampling</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<br>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part3_spheres_hemisphere.png" width="400px"/>
+				  <figcaption>Uniform Hemisphere Sampling Result</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part3_spheres_importance.png" width="400px"/>
+				  <figcaption>Importance Sampling Result</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<br>
+
+		<p>Focusing in on the bunny, we can compare the noise levels of its shadow when rendering with different amounts of light rays while keeping the sample rate per pixel consistently at 1. This is done using light sampling, not uniform hemisphere sampling:</p>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part3_bunny_1LR.png" width="400px"/>
+				  <figcaption>1 Light Ray</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part3_bunny_4LR.png" width="400px"/>
+				  <figcaption>4 Light Rays</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<br>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part3_bunny_16LR.png" width="400px"/>
+				  <figcaption>16 Light Rays</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part3_bunny_64LR.png" width="400px"/>
+				  <figcaption>64 Light Rays</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<p>As we can see, the effects are dramatic. As we increase the number of light rays, the noise levels decrease and the results look much more realistic. The graininess reduces and the “clustering” of the black dots gets more compact. The transition from darker to lighter areas of the shadow are much smoother as they follow the amount of light exposed in those areas as you go further from the bunny’s feet. This is all because we are averaging multiple occlusion tests per intersection point when we increase the number of light rays, eliminating the pure binary result of whether a light source is blocked.</p>
+
+		<p>To wrap up, uniform hemisphere sampling and lighting sampling produce very different results due to their different approaches. As we can see from the above images of the bunny and the spheres, the graininess across the entire scene is drastically reduced when going from uniform hemisphere to lighting sampling, making the images look more silky smooth instead of having a “TV static” effect to them. This effect in uniform hemisphere sampling is because we shoot rays in random directions where there is a very low (or impossible) chance of hitting certain light sources, especially if they are small (point lights). Importance/lighting sampling, on the other hand, directs every single ray towards the light sources as we iterate through them ensuring we hit all light sources, including those small point lights, while using fewer samples as well.</p>
+
+		<br>
 
 		<h2>Part 4: Global Illumination</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>The indirect lighting function enables us to produce even more realistic images by not only calculating the amount of direct light an object reflects, but also the indirect light coming from objects around it. In reality, light bounces off everything and everywhere, where objects are lit up by a combination of all the light that reaches them. This is done by increasing the amount of bounces we allow light to have from just the zero or one bounce we used previously. The results are effects called color bleeding, where one object’s color influences the color of another object the light bounces off to, and ambient shadows, soft diffuse shadows that appear in tight corners and where objects meet a surface.</p>
+
+		<p>My implementation of the indirect lighting function builds off of what we did in part 3. We begin by using the sampler to pick a random direction from our collision point and shooting a single ray that way in search of light (if we sample multiple times per pixel, we will average out the colors returned by these rays). We then dive into the core of the entire process, the function <code>at_least_one_bounce_radiance()</code>, which calculates light at our surface point and then recursively calls itself to estimate and add up subsequent radiances until we reach our bounce limit.</p>
+
+		<p>This function starts by accumulating all direct light for this surface point into a running sum, <code>L_out</code>, if <code>isAccumBounces</code> is set to true by calling <code>one_bounce_radiance()</code>. If it is false, we add direct light to <code>L_out</code> only if this is the final bounce (i.e., <code>r.depth == 1</code>). We then check our base case: if we reach our depth limit of <code>max_ray_depth</code>, stop and return the light we have so far (when <code>r.depth <= 1</code>). Otherwise, we bounce to the next object. To prevent our rays from bouncing forever, I also implemented another termination approach known as Russian Roulette at this point in the function that will work together with the hard limit of <code>max_ray_depth</code>. This process uses a termination probability of 0.35 (0.65 survival probability) and then flips a coin based on this probability. If a ray survives, we’ll scale it accordingly so as to prevent bias and compensate for lost rays by boosting the brightness of those that survived. If our ray dies, we return <code>L_out</code> without adding indirect light. Note that Russian Roulette is not used on the first bounce to ensure each pixel gets at least one indirect bounce.</p>
+
+		<p>If we make it past the termination checks, we continue finding out where light bounced from. We pick a direction randomly to check if light is indeed coming from that way as well as get the BSDF of this intersection point to know how much of that incoming light will be reflected or absorbed. If our chosen direction is valid, we convert it from object to world space by multiplying it by <code>o2w</code>. We then create a new <code>Ray</code>> object starting from our collision point pointed in this direction and prepare it by setting <code>min_t</code> to <code>EPS_F</code> to avoid numerical precision issues and by reducing the ray’s depth by one from the previous ray. Once it’s ready, we fire it into the scene and check if it hits anything using our previously implemented <code>bvh->intersect()</code> function again. This function call serves as another termination check: if we don’t hit anything, return the light we have so far. Otherwise, we are all set up and ready to recursively perform this process again on the fired ray and the next object hit. The light returned from these deeper recursive calls represents the indirect light from the rest of the scene in that direction.</p>
+
+		<p>When we get back the indirect light, we have to calculate the angle it is arriving at. A light beam hitting a surface head on will have a stronger effect than a beam hitting it at a shallower angle (captured by Lambert’s cosine law), which is important when calculating how much light gets reflected. The cosine of this angle is simply the z-component of our sampled direction. The true magic then happens here when we apply the rendering equation: we take the light from our deeper recursive calls, multiply it by this object’s BSDF value, scale it by this cosine term, and divide it by the pdf to correctly weight the final contribution. Since we know at this point we survived Russian Roulette (if it is used), we compensate for the lost rays by boosting this ray’s color to prevent bias as mentioned above by dividing it by the survival probability (0.65).</p>
+
+		<p>The last part of our function determines how to set <code>L_out</code> based on the mode we are in. If we are rendering the image, <code>isAccumBounces</code> will be set to true, meaning we should add the light from every bounce to our sum of total accumulated light. Otherwise, we are just checking the indirect light itself for debugging purposes, so we should set <code>L_out</code> to the indirect light directly (no accumulation). The final step is to return the final color, which will either be sent back to the previous recursive call or be used to color the pixel itself.</p>
+
+		<p>One last modification was made to <code>est_radiance_global_illumination()</code>. I removed the call to <code>one_bounce_radiance()</code> we previously had and replaced it with our newly implemented <code>at_least_one_bounce_radiance()</code> function since it accounts for one bounce already (we call <code>one_bounce_radiance()</code> within it).</p>
+
+		<p>Here are some images rendered using my global illumination implementation using 1024 samples per pixel, along with some images that have more complicated geometries we are now able to render at this point:</p>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_bunny_global.png" width="400px"/>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_spheres_global.png" width="400px"/>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<br>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_wall-e_global.png" width="400px"/>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_blob_global.png" width="400px"/>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<br>
+
+		<p>Using the scene of the spheres shown above, we can now compare what it looks like rendered with only direct illumination and with only indirect illumination, again using 1024 samples per pixel:</p>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_spheres_direct_only.png" width="400px"/>
+				  <figcaption>Direct Illumination Only</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_spheres_indirect_only.png" width="400px"/>
+				  <figcaption>Indirect Illumination Only</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<br>
+
+		<p>We can see major differences when comparing the two approaches to each other. In direct illumination only, we have the presence of shadows that accurately represent how much light is being blocked from the light source since we only care about direct light. The undersides of the spheres as well as the ground have dark cast shadows that are black since there is no color bleeding from the walls. The scene as a whole is also very sharp with high contrast. One more thing to note is that the ceiling is pitch black while the light source is lit up. This is because the light is emitted downward and cannot reach the ceiling directly, something to keep in mind when comparing it to indirect illumination.</p>
+
+		<p>In indirect illumination only, we do have color bleeding as we can see red and blue on both of the spheres. This is because light is bouncing multiple times, casting the colors of the walls onto nearby objects. However, in this approach we have a much less shadow presence (or none in some areas) since we removed direct light from the areas that are directly blocked from the light source. Specifically, the undersides of the spheres are now lit up from indirect lighting compared to being pitch black in direct illumination only. Where the scene is very sharp in direct illumination, in indirect illumination we have a softer lighting effect because the more light bounces off objects, the more energy it loses. As for the ceiling, here it is lit up because of the indirect light bouncing off of the ground, walls, and spheres back up to it, something direct lighting wasn’t able to do.</p>
+
+		<p>In the following grid, we can see the results of rendering the same scene of the bunny by changing the number of times the light bounces, ranging from 0 to 5 inclusive, by setting <code>max_ray_depth</code> accordingly. We can also see the results of rendering these bounces while either not accumulating (top) or accumulating (bottom) the bounces together. All images used 1024 samples per pixel:</p>
+
+		<br>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="text-align: center; border-collapse: collapse;">
+				<tr>
+
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_no_accum_0.png" width="200px" style="display: block;"/>
+						<figcaption>m = 0</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_no_accum_1.png" width="200px" style="display: block;"/>
+						<figcaption>m = 1</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_no_accum_2.png" width="200px" style="display: block;"/>
+						<figcaption>m = 2</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_no_accum_3.png" width="200px" style="display: block;"/>
+						<figcaption>m = 3</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_no_accum_4.png" width="200px" style="display: block;"/>
+						<figcaption>m = 4</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_no_accum_5.png" width="200px" style="display: block;"/>
+						<figcaption>m = 5</figcaption>
+					</td>
+					
+				</tr>
+			</table>
+		</div>
+		
+		<br>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="text-align: center; border-collapse: collapse;">
+				<tr>
+
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_yes_accum_0.png" width="200px" style="display: block;"/>
+						<figcaption>m = 0</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_yes_accum_1.png" width="200px" style="display: block;"/>
+						<figcaption>m = 1</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_yes_accum_2.png" width="200px" style="display: block;"/>
+						<figcaption>m = 2</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_yes_accum_3.png" width="200px" style="display: block;"/>
+						<figcaption>m = 3</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_yes_accum_4.png" width="200px" style="display: block;"/>
+						<figcaption>m = 4</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_yes_accum_5.png" width="200px" style="display: block;"/>
+						<figcaption>m = 5</figcaption>
+					</td>
+					
+				</tr>
+			</table>
+		</div>
+
+		<br>
+
+		<p>Looking at the images for the second and third bounces of light (no accumulation), we can see what the images start to look like when we remove zero and one bounce light. Looking at the two bounce image, we see the ceiling lit up compared to the pitch black it was in one bounce. This is because we have light now bouncing multiple times, enabling it to reach the ceiling from off the floor and other surfaces in the scene. For the same reason, the areas that were in shadows are now lit up as well, specifically right underneath the bunny itself. In the two bounce image, we also begin to see color bleeding for the first time with red and blue being reflected onto the bunny, the floor, the back wall, and the ceiling from the left and right walls. Moving onto the three bounce image, the first noticeable difference compared to the two bounce image is the brightness of the entire scene. It is much darker because the more light bounces, the more energy gets lost. This is true for all subsequent bounces starting from m = 1. The three bounce image also combines the different colors of the scene more evenly, removing sharp contrasts from the previous step. </p>
+
+		<p>Using multiple bounces of light to illuminate the scene has many benefits in regard to the quality of the image compared to rasterization. Rasterization only takes into consideration direct lighting, equivalent to one bounce of light, which as a result leaves areas blocked from the light source pitch black as seen in the one bounce image. Multiple bounces creates softer shadows that accurately reflect how much light is reaching certain areas, such as closer or further from the bunny’s feet, as well as in tight crevices. As just explained above, computing multiple bounces of light also creates a much more realistic image in terms of color. We simulate the behavior of light in real-life where as rays bounce numerous times, color “bleeds” onto nearby objects, something rasterization cannot do or is very limited to.</p>
+
+		<p>The bottom row of our grid shows the rendered images using 0 to 5 bounces of light as well, except this time accumulating them along the way. We now compare the results of accumulating and not accumulating bounces of light, the most glaring difference being the overall brightness of the entire scene. In both accumulated and unaccumulated light, the 0th bounce renders only the light source itself with the rest of the room pitch black. This is because we are only taking in the light that reaches the camera directly without hitting anything in the scene. Direct illumination, or one bounce, looks mostly the same in both cases because we are calculating the single bounce of light, the main difference being the light source itself. Accumulated mode shows the light source since we add up the 0th and 1st bounce, whereas unaccumulated mode just shows the 1st bounce and not the light source. Two bounces is where we begin to see major differences. In accumulated light, we are adding up the direct light and indirect light (0, 1, and 2 bounces) whereas unaccumulated light isolates just the light rays bouncing a second time. This is what creates the brighter image in accumulated light mode. This theme remains true the rest of the way up to five bounces of light. In accumulated light mode, we add up each subsequent bounce of indirect light to the total, creating brighter images each time but reaching a diminishing return the more we go. In unaccumulated light mode, each subsequent bounce has less energy than the previous one, so we get darker images each time almost to the point where we can’t see the bunny at all.</p>
+
+		<p>When rendering images with light bouncing many times, we don’t want to have them bounce forever and can use a hard stopping point like <code>max_ray_depth</code>. However, in this project we also implemented a method known as Russian Roulette which flips a coin set with a survival probability to determine whether a light ray should continue bouncing. This method allows us to stop sooner without rendering diminishing returns while also keeping the image’s brightness accurate by accounting for rays that were lost. Below are images rendered using Russian Roulette using 1024 samples per pixel:</p>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="text-align: center; border-collapse: collapse;">
+				<tr>
+
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_RR_0.png" width="200px" style="display: block;"/>
+						<figcaption>m = 0</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_RR_1.png" width="200px" style="display: block;"/>
+						<figcaption>m = 1</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_RR_2.png" width="200px" style="display: block;"/>
+						<figcaption>m = 2</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_RR_3.png" width="200px" style="display: block;"/>
+						<figcaption>m = 3</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_RR_4.png" width="200px" style="display: block;"/>
+						<figcaption>m = 4</figcaption>
+					</td>
+					<td style="text-align: center; padding: 0;">
+						<img src="assets/Part4_bunny_RR_100.png" width="200px" style="display: block;"/>
+						<figcaption>m = 100</figcaption>
+					</td>
+					
+				</tr>
+			</table>
+		</div>
+
+		<br>
+
+		<p>We get increasingly brighter images starting from m = 0 up to m = 4. Setting m = 100 shows that we can set a very high ceiling for the maximum number of bounces and still get an image almost visually identical to just m = 4 without a major increase in render time. This is because light rays are almost certain to not survive 100 consecutive bounces with our survival probability (0.65), which allows us to terminate sooner and still get the converged image.</p>
+
+		<p>Finally, here we rendered images of the sphere again, this time using various sample-per-pixel-rates (SPP) while using four light rays:</p>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_spheres_SPP_1.png" width="300px"/>
+				  <figcaption>SPP = 1</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_spheres_SPP_2.png" width="300px"/>
+				  <figcaption>SPP = 2</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part4_spheres_SPP_4.png" width="300px"/>
+				  <figcaption>SPP = 4</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<div style="display: flex; justify-content: center;">
+			<table style="border-collapse: collapse;">
+				<tr>
+					<td style="text-align: center; padding: 8px;">
+						<img src="assets/Part4_spheres_SPP_8.png" width="300px" style="display: block;"/>
+						<figcaption>SPP = 8</figcaption>
+					</td>
+					<td style="text-align: center; padding: 8px;">
+						<img src="assets/Part4_spheres_SPP_16.png" width="300px" style="display: block;"/>
+						<figcaption>SPP = 16</figcaption>
+					</td>
+				</tr>
+
+				<tr>
+					<td style="text-align: center; padding: 8px;">
+						<img src="assets/Part4_spheres_SPP_64.png" width="300px" style="display: block;"/>
+						<figcaption>SPP = 64</figcaption>
+					</td>
+					<td style="text-align: center; padding: 8px;">
+						<img src="assets/Part4_spheres_SPP_1024.png" width="300px" style="display: block;"/>
+						<figcaption>SPP = 1024</figcaption>
+					</td>
+				</tr>
+			</table>
+		</div>
+
+		<p>Looking at the lower SPP images, we see a lot of noise across the scene comparable to a “TV” static effect because we are using a very small number of samples per pixel. The “dots” or “grains” are scattered across the image and take on random colors that don’t consistently merge and inaccurately reflect the color bleeding we want. As we increase the SPP rate, we see this effect dramatically reduce, leading up to a very clean, converged result (1024) where essentially all noise is completely removed and the color bleeding is much more smooth. It is important to also note that naturally, there is a computational tradeoff involved where as we increase the SPP rate, our rendering time increases alongside it.</p>
+
+		<br>
 
 		<h2>Part 5: Adaptive Sampling</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>Up to this point we have improved the quality of our images by simply shooting more rays through each pixel and waiting large amounts of time for our images to render. We shot the same amount of rays across each pixel regardless of how simple or detailed the objects actually were at those points. Not every pixel needs this much work. We can instead save time by putting more effort into the more difficult parts of the scene and do less work where it isn’t needed through a process called adaptive sampling. In adaptive sampling, we can check the progress of each pixel and move on when we see the color stabilize. This will allow us to use less computation on pixels that don’t need it and more for those that do because we don’t waste time and rays on backgrounds with consistent colors. We still keep the sample rate high for more complicated areas to reduce the noise and reach our final converged result.</p>
 
-		<h2>(Optional) Part 6: Extra Credit Opportunities</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-		
-		<h2>Additional Notes (please remove)</h2>
-		<ul>
-			<li>You can also add code if you'd like as so: <code>code code code</code></li>
-			<li>If you'd like to add math equations, 
-				<ul>
-					<li>You can write inline equations like so: \( a^2 + b^2 = c^2 \)</li>
-					<li>You can write display equations like so: \[ a^2 + b^2 = c^2 \]</li>
-				</ul>
-			</li>
-		</ul>
+		<p>To implement adaptive sampling, I modified the <code>raytrace_pixel()</code> function to incorporate this functionality. I first created running sums of each ray’s brightness and their brightness squared (the illuminance) in addition to how many rays we’ve shot so far (we might not shoot all <code>ns_aa</code> rays). I then modified the loop to include the benefit of adaptive sampling - whether or not a pixel has converged to its final color. This if statement skips the 0th ray since we haven’t shot anything yet and it checks if the current ray is a multiple of <code>samplesPerBatch</code> so that we can save time by checking in batches instead of each individual ray. If both cases pass, we then move on to actually checking for convergence using the formulas provided in the project spec. We calculate the average brightness of the rays shot so far as well as the variance and standard deviation. At this point we can check if <code>I</code>, our pixel’s convergence, is small enough based on <code>maxTolerance</code> and <code>mu</code> for this pixel to be considered “done” and move on if it is. We end by getting the average color by dividing by how many rays we actually shot (not <code>ns_aa</code>) and updating our buffers <code>sampleBuffer</code> and <code>sampleCountBuffer</code> to generate the sampling rate heatmap.</p>
+
+		<p>Using our favorite scenes of the bunny and the spheres, here are both scenes rendered using adaptive sampling, 2048 samples per pixel, 1 sample per light, and a max ray depth of 5, along with their sampling rate images.</p>
+
+		<br>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part5_bunny.png" width="400px"/>
+				  <figcaption>Adaptive Sampling</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part5_bunny_rate.png" width="400px"/>
+				  <figcaption>Sampling Rate Heatmap</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<br>
+
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/Part5_spheres.png" width="400px"/>
+				  <figcaption>Adaptive Sampling</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/Part5_spheres_rate.png" width="400px"/>
+				  <figcaption>Sampling Rate Heatmap</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
+		<p>In both cases, we can clearly see visible differences in sampling rates in different regions with red indicating higher rates and blue indicating lower ones. In particular, the undersides of the bunny and spheres require many more samples to converge due to their high variance. The colors of the walls, on the other hand (not including the ceiling), are mostly consistent, converge very quickly, and therefore require fewer samples.</p>
+
+		<br>
+
+		<h2>Acknowledgement of AI</h2>
+		<p>I used AI to receive help in conceptual understanding throughout the assignment. These ranged from conceptual understandings to understanding the directions in each part of the assignment. For example, I used it to help me understand the different coordinate systems that were in play and had a conversation with it using analogies like the cone shape from the beams of a flashlight (rays), sliced by a piece of paper (sensor). I also used it to clarify the directions in regard to the BVH. As I read the spec, I got confused on the different directions and learned from AI to think about “growing” our bounding box to measure how many primitives there are, which is not to be implemented as such when recursively splitting them up. There were a lot of formulas involved in this assignment that I didn’t fully understand the first time from the lectures, such as the Monte Carlo estimator, so I received help breaking those down as well.</p>
+
+		<p>I also received assistance from AI in my writeup since I am not fully familiar with HTML, particularly when trying to format my images. For example, when forming my 2 x 6 grid comparing accumulated and unaccumulated bounces in part 4, some images were wildly spaced out compared to the rest. These many images were different from the 2 x 2 grid we had starter code for, so I received help in what to write to make sure they were all next to each other since I didn’t know how to. I also received help when trying to space out rows from each other since some appeared too close to the ones above/below them, especially when these images have captions that need to have room to be more readable.</p>
+
+		<br>
+
+
 		</div>
 	</body>
 </html>
