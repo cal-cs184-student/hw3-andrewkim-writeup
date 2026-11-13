@@ -41,12 +41,14 @@
 
 		<br>
 
+
 		<h2>Overview</h2>
 		<p>In this assignment, I implemented a physically-based path tracer that simulates the physics of light in order to create highly realistic images. We started by creating the means to do this through ray intersection by shooting a ray from our camera, through a screen, and into the scene we want to render an image of. Naturally, all of the processes in this assignment required a lot of time to calculate, so we then implemented a way to speed them up through Bounding Volume Hierarchy, similar to bounding boxes we used in previous assignments. Finally, we implemented the meat of the assignment, the behavior of light itself, for both direct and global illumination, ending by implementing an even faster way to render images, adaptive sampling.</p>
 
 		<p>Something interesting I really enjoyed in this assignment was the process of converting real life physics and light into a computer to simulate. We didn’t have to specify exactly where a shadow falls or what color gets reflected onto nearby objects to the computer. Instead, I found it really cool how the engine simulated these effects all at once by applying our math across the entire scene.</p>
 
 		<br>
+
 
 		<h2>Part 1: Ray Generation and Scene Intersection</h2>
 		<p>The ray generation part of the rendering pipeline enables us to take a 3-dimensional scene and convert it into a 2-dimensional image on our screen. To understand the process, it is important to understand the numerous coordinate spaces we work in when doing so, namely the world space and camera space. The world space is the environment of the 3D scene where objects are placed at locations with coordinates that never change. The camera space is from the perspective of the viewer, like first-person mode in a video game, as they look around the scene. These coordinates stay unchanged relative to the viewer, but the camera’s location in the scene does change as it moves around. To create 2D images of a 3D scene, we use the help of a “virtual window” that we can visualize as a screen set up right in front of the camera. This window acts as the 2D display that is your screen, and it will help us determine what color each pixel should be as we look through the window into the scene.</p>
@@ -75,6 +77,7 @@
 		</figure>
 
 		<br>
+
 		
 		<h2>Part 2: Bounding Volume Hierarchy</h2>
 		<p>My BVH construction algorithm is implemented using the binary tree structure as explained in the project spec. At a high-level, we group primitives up into boxes that we then check whether rays hit, enabling us to eliminate entire boxes at a time if no collisions occur and thus speed up the rendering process.</p>
@@ -116,6 +119,7 @@
 		<p>I rendered some scenes that have moderately complex geometries with and without BVH acceleration to compare their rendering times. To render without BVH acceleration, I commented out my implementation in <code>has_intersection()</code> and <code>intersect()</code>, replacing them with loops that go through each primitive linearly. Using cow.dae from the timing experiment in this section, without using BVH acceleration it took 49.8036 seconds to render the image. However, with BVH acceleration it took just 0.1646 seconds. When rendering CBcoil.dae without BVH acceleration, it took 48.2403 seconds to complete, while using BVH acceleration took just 0.1601 seconds. Rendering building.dae took the longest at a whopping 712.2459 seconds (11.87 minutes!) without BVH acceleration, but using BVH acceleration brought it all the way down to just 0.0954 seconds (the fastest of the three!). As we can see, using BVH acceleration is clearly much faster than without it, using just simple heuristics as in my implementation, taking rendering time from O(n) complexity down to O(log(n)). This is because it allows us to bypass many primitives at once using the binary tree structure, allowing us to avoid going through those not in the bounding boxes (which linearly checking does go through, hence the longer times).</p>
 
 		<br>
+
 
 		<h2>Part 3: Direct Illumination</h2>
 		<p>The direct lighting function can be used with either uniform hemisphere sampling or by importance sampling, both of which are used to simulate how light behaves in our 3D scene. These enable us to create realistic shadows and highlights when we have a light source that shines on the objects. In this part, we were concerned with rendering light bouncing one time before reaching our camera.</p>
@@ -205,6 +209,7 @@
 		<p>To wrap up, uniform hemisphere sampling and lighting sampling produce very different results due to their different approaches. As we can see from the above images of the bunny and the spheres, the graininess across the entire scene is drastically reduced when going from uniform hemisphere to lighting sampling, making the images look more silky smooth instead of having a “TV static” effect to them. This effect in uniform hemisphere sampling is because we shoot rays in random directions where there is a very low (or impossible) chance of hitting certain light sources, especially if they are small (point lights). Importance/lighting sampling, on the other hand, directs every single ray towards the light sources as we iterate through them ensuring we hit all light sources, including those small point lights, while using fewer samples as well.</p>
 
 		<br>
+
 
 		<h2>Part 4: Global Illumination</h2>
 		<p>The indirect lighting function enables us to produce even more realistic images by not only calculating the amount of direct light an object reflects, but also the indirect light coming from objects around it. In reality, light bounces off everything and everywhere, where objects are lit up by a combination of all the light that reaches them. This is done by increasing the amount of bounces we allow light to have from just the zero or one bounce we used previously. The results are effects called color bleeding, where one object’s color influences the color of another object the light bounces off to, and ambient shadows, soft diffuse shadows that appear in tight corners and where objects meet a surface.</p>
@@ -447,6 +452,7 @@
 
 		<br>
 
+
 		<h2>Part 5: Adaptive Sampling</h2>
 		<p>Up to this point we have improved the quality of our images by simply shooting more rays through each pixel and waiting large amounts of time for our images to render. We shot the same amount of rays across each pixel regardless of how simple or detailed the objects actually were at those points. Not every pixel needs this much work. We can instead save time by putting more effort into the more difficult parts of the scene and do less work where it isn’t needed through a process called adaptive sampling. In adaptive sampling, we can check the progress of each pixel and move on when we see the color stabilize. This will allow us to use less computation on pixels that don’t need it and more for those that do because we don’t waste time and rays on backgrounds with consistent colors. We still keep the sample rate high for more complicated areas to reduce the noise and reach our final converged result.</p>
 
@@ -491,6 +497,7 @@
 		<p>In both cases, we can clearly see visible differences in sampling rates in different regions with red indicating higher rates and blue indicating lower ones. In particular, the undersides of the bunny and spheres require many more samples to converge due to their high variance. The colors of the walls, on the other hand (not including the ceiling), are mostly consistent, converge very quickly, and therefore require fewer samples.</p>
 
 		<br>
+
 
 		<h2>Acknowledgement of AI</h2>
 		<p>I used AI to receive help in conceptual understanding throughout the assignment. These ranged from conceptual understandings to understanding the directions in each part of the assignment. For example, I used it to help me understand the different coordinate systems that were in play and had a conversation with it using analogies like the cone shape from the beams of a flashlight (rays), sliced by a piece of paper (sensor). I also used it to clarify the directions in regard to the BVH. As I read the spec, I got confused on the different directions and learned from AI to think about “growing” our bounding box to measure how many primitives there are, which is not to be implemented as such when recursively splitting them up. There were a lot of formulas involved in this assignment that I didn’t fully understand the first time from the lectures, such as the Monte Carlo estimator, so I received help breaking those down as well.</p>
